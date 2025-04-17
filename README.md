@@ -1,32 +1,45 @@
-# Iraqinews RSS Proxy
+# Iraqi News RSS Proxy
 
-A lightweight, self-hosted RSS proxy that filters articles from [IraqiNews](https://iraqinews.com/rss), showing only news from the `/iraq/` section.
+A simple service that provides a filtered RSS feed from iraqinews.com, containing only Iraq-related news articles.
 
-Useful for custom feeds, clean reading, or RSS readers like [Inoreader](https://www.inoreader.com/).
+## What it Does
 
----
+- Filters iraqinews.com RSS feed to show only Iraq-related news
+- Provides a clean, easy-to-use RSS feed
+- Works with any RSS reader
+- Updates automatically
 
-## 🚀 Features
+## Installation
 
-- Filters the official [IraqiNews RSS](https://iraqinews.com/rss) feed
-- Keeps only articles where the URL starts with `https://www.iraqinews.com/iraq/`
-- Generates a valid RSS feed
-- Easily deployable using Docker or Fly.io
-
----
-
-## 📦 Requirements
-
-- Python 3.12+
-- Docker (optional)
-- Fly.io account (for deployment)
-
----
-
-## 🔧 Local Development
-
-1. Clone the repo:
+1. Clone the repository:
 
    ```bash
    git clone https://github.com/mhmdxsadk/iraqinews-rss-proxy.git
    cd iraqinews-rss-proxy
+   ```
+
+2. Install dependencies:
+
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+## Usage
+
+1. Start the server:
+
+   ```bash
+   python main.py
+   ```
+
+2. Access the filtered RSS feed:
+
+   ```
+   http://localhost:5555/
+   ```
+
+Add this URL to your favorite RSS reader to get only Iraq-related news from iraqinews.com.
+
+## License
+
+This project is licensed under the MIT License.

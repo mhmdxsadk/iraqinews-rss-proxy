@@ -1,0 +1,7 @@
+flask==2.3.3
+feedparser==6.0.10
+requests==2.31.0
+cloudscraper==1.2.71
+Flask-Limiter==3.5.1
+defusedxml==0.7.1
+Flask-Compress==1.14.0 

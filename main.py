@@ -35,28 +35,25 @@ class FeedEntry:
         self.published = published
 
     def to_xml(self) -> ET.Element:
-        """Convert entry to XML element"""
         item = ET.Element("item")
 
-        # Basic text fields (escaped)
-        title = ET.SubElement(item, "title")
-        title.text = escape(self.title or "Untitled")
+        ET.SubElement(item, "title").text = escape(self.title or "Untitled")
+        ET.SubElement(item, "link").text = escape(self.link or "#")
 
-        link = ET.SubElement(item, "link")
-        link.text = escape(self.link or "#")
-
-        # Properly escaped HTML description
+        # Add basic description (optional short version)
         description = ET.SubElement(item, "description")
-        description.text = self.description or "No description available"
+        description.text = escape(self.description or "")
 
-        # GUID
-        guid = ET.SubElement(item, "guid")
-        guid.text = escape(self.link)
+        # Add full HTML content using content:encoded
+        content_encoded = ET.SubElement(
+            item, "{http://purl.org/rss/1.0/modules/content/}encoded"
+        )
+        content_encoded.text = f"<![CDATA[{self.description or ''}]]>"
 
-        # Optional: pubDate
+        ET.SubElement(item, "guid").text = escape(self.link)
+
         if self.published:
-            pub_date = ET.SubElement(item, "pubDate")
-            pub_date.text = self.published
+            ET.SubElement(item, "pubDate").text = self.published
 
         return item
 

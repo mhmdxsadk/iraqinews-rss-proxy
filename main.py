@@ -34,7 +34,6 @@ class FeedEntry:
         self.description = description
         self.published = published
 
-
     def to_xml(self) -> ET.Element:
         """Convert entry to XML element"""
         item = ET.Element("item")
@@ -59,7 +58,7 @@ class FeedEntry:
             pub_date = ET.SubElement(item, "pubDate")
             pub_date.text = self.published
 
-        return item`
+        return item
 
 
 class FeedManager:

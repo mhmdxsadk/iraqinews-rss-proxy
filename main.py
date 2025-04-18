@@ -5,6 +5,7 @@ import xml.etree.ElementTree as ET
 from datetime import datetime
 from functools import lru_cache
 from typing import List, Optional
+from xml.sax.saxutils import escape
 
 import cloudscraper
 import feedparser
@@ -33,31 +34,32 @@ class FeedEntry:
         self.description = description
         self.published = published
 
+
     def to_xml(self) -> ET.Element:
         """Convert entry to XML element"""
         item = ET.Element("item")
 
-        # Basic fields without escaping
+        # Basic text fields (escaped)
         title = ET.SubElement(item, "title")
-        title.text = self.title or "Untitled"
+        title.text = escape(self.title or "Untitled")
 
         link = ET.SubElement(item, "link")
-        link.text = self.link or "#"
+        link.text = escape(self.link or "#")
 
-        # Wrap raw HTML inside CDATA
+        # Properly escaped HTML description (will render readable in Inoreader)
         description = ET.SubElement(item, "description")
-        description.text = f"<![CDATA[{self.description or ''}]]>"
+        description.text = escape(self.description or "No description available")
 
-        # guid for Inoreader
+        # GUID
         guid = ET.SubElement(item, "guid")
-        guid.text = self.link
+        guid.text = escape(self.link)
 
         # Optional: pubDate
         if self.published:
             pub_date = ET.SubElement(item, "pubDate")
             pub_date.text = self.published
 
-        return item
+        return item`
 
 
 class FeedManager:

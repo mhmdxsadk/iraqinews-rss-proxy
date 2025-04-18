@@ -42,4 +42,4 @@ Add this URL to your favorite RSS reader to get only Iraq-related news from iraq
 
 ## License
 
-This project is licensed under the MIT License.
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.

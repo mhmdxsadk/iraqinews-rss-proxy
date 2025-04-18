@@ -4,7 +4,7 @@
 #
 
 app = 'iraqinews-rss-proxy'
-primary_region = 'fra'
+primary_region = 'mad'
 
 [build]
 

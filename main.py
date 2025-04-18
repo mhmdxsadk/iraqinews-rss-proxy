@@ -1,3 +1,4 @@
+import html
 import logging
 import os
 import re
@@ -40,12 +41,15 @@ class FeedEntry:
         elements = {
             "title": self.title,
             "link": self.link,
-            "description": self.description,
+            "description": html.escape(self.description or ""),
         }
 
         for key, value in elements.items():
             element = ET.SubElement(item, key)
             element.text = value
+
+        guid = ET.SubElement(item, "guid")
+        guid.text = self.link
 
         if self.published:
             pub_date = ET.SubElement(item, "pubDate")

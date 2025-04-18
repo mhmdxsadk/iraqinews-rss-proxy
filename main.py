@@ -113,7 +113,7 @@ def filtered_feed():
 
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5555))
+    port = int(os.environ.get("PORT", 8080))
     host = "localhost" if os.environ.get("FLASK_ENV") == "development" else "0.0.0.0"
     debug = os.environ.get("FLASK_ENV") == "development"
     app.run(host=host, port=port, debug=debug)

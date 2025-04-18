@@ -6,7 +6,7 @@ import cloudscraper
 from flask import Flask, Response
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
-from lxml import etree
+from lxml import etree, html
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 # Set up logging
@@ -36,10 +36,17 @@ def fetch_feed() -> Optional[str]:
         return None
 
 
+def create_cdata_element(tag: str, text: str, parent) -> etree._Element:
+    """Create an element with CDATA content"""
+    elem = etree.SubElement(parent, tag)
+    elem.text = etree.CDATA(text)
+    return elem
+
+
 def filter_feed(feed_content: str) -> str:
     """Filter the feed to keep only Iraq-related articles"""
     # Parse the feed with lxml
-    parser = etree.XMLParser(strip_cdata=False, remove_blank_text=True)
+    parser = etree.XMLParser(strip_cdata=False, remove_blank_text=True, recover=True)
     root = etree.fromstring(feed_content.encode("utf-8"), parser)
 
     # Find all items
@@ -61,7 +68,62 @@ def filter_feed(feed_content: str) -> str:
     for item in items:
         link = item.find("link")
         if link is not None and "/iraq/" in link.text.lower():
-            channel.append(item)
+            # Create new item with proper CDATA sections
+            new_item = etree.SubElement(channel, "item")
+
+            # Copy title and link
+            title = etree.SubElement(new_item, "title")
+            title.text = item.find("title").text
+            link_elem = etree.SubElement(new_item, "link")
+            link_elem.text = link.text
+
+            # Add creator with CDATA
+            creator = item.find("{http://purl.org/dc/elements/1.1/}creator")
+            if creator is not None:
+                create_cdata_element(
+                    "{http://purl.org/dc/elements/1.1/}creator", creator.text, new_item
+                )
+
+            # Add publication date
+            pub_date = item.find("pubDate")
+            if pub_date is not None:
+                pub_date_elem = etree.SubElement(new_item, "pubDate")
+                pub_date_elem.text = pub_date.text
+
+            # Add categories with CDATA
+            for category in item.findall("category"):
+                create_cdata_element("category", category.text, new_item)
+
+            # Add guid
+            guid = item.find("guid")
+            if guid is not None:
+                guid_elem = etree.SubElement(new_item, "guid")
+                guid_elem.text = guid.text
+                if guid.get("isPermaLink"):
+                    guid_elem.set("isPermaLink", guid.get("isPermaLink"))
+
+            # Add description with CDATA
+            desc = item.find("description")
+            if desc is not None:
+                desc_text = (
+                    desc.text if desc.text else html.tostring(desc, encoding="unicode")
+                )
+                create_cdata_element("description", desc_text, new_item)
+
+            # Add content:encoded with CDATA
+            content = item.find("{http://purl.org/rss/1.0/modules/content/}encoded")
+            if content is not None:
+                content_text = (
+                    content.text
+                    if content.text
+                    else html.tostring(content, encoding="unicode")
+                )
+                create_cdata_element(
+                    "{http://purl.org/rss/1.0/modules/content/}encoded",
+                    content_text,
+                    new_item,
+                )
+
             iraq_items += 1
 
     logger.info(
@@ -70,7 +132,12 @@ def filter_feed(feed_content: str) -> str:
 
     # Convert back to string preserving CDATA and formatting
     return etree.tostring(
-        root, encoding="utf-8", xml_declaration=True, pretty_print=True, method="xml"
+        root,
+        encoding="utf-8",
+        xml_declaration=True,
+        pretty_print=True,
+        method="xml",
+        with_tail=False,
     ).decode("utf-8")
 
 

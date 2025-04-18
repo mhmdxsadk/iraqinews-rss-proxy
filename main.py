@@ -41,41 +41,46 @@ class FeedEntry:
         self.content = content
         self.media_content = media_content or []
 
+    def _create_cdata_element(self, parent: ET.Element, tag: str, text: str) -> None:
+        """Create an element with CDATA content"""
+        elem = ET.SubElement(parent, tag)
+        elem.text = ET.CDATA(text)
+
     def to_xml(self) -> ET.Element:
         """Convert entry to XML element"""
         item = ET.Element("item")
 
-        # Basic elements
-        elements = {
-            "title": self.title,
-            "link": self.link,
-            "description": self.description,
-        }
+        # Title and link (no CDATA needed)
+        title = ET.SubElement(item, "title")
+        title.text = self.title
+        link = ET.SubElement(item, "link")
+        link.text = self.link
 
-        for key, value in elements.items():
-            element = ET.SubElement(item, key)
-            element.text = value
+        # Description and content with CDATA
+        self._create_cdata_element(item, "description", self.description)
 
         if self.published:
-            pub_date = ET.SubElement(item, "pubDate")
-            pub_date.text = self.published
+            pubDate = ET.SubElement(item, "pubDate")
+            pubDate.text = self.published
 
-        # Add content if available
+        # Add full content if available
         if self.content:
-            content = ET.SubElement(
-                item,
-                "content:encoded",
-                xmlns="http://purl.org/rss/1.0/modules/content/",
+            self._create_cdata_element(
+                item, "{http://purl.org/rss/1.0/modules/content/}encoded", self.content
             )
-            content.text = self.content
 
         # Add media content if available
         for media in self.media_content:
-            media_element = ET.SubElement(
-                item, "media:content", xmlns="http://search.yahoo.com/mrss/"
+            media_content = ET.SubElement(
+                item, "{http://search.yahoo.com/mrss/}content"
             )
             for key, value in media.items():
-                media_element.set(key, value)
+                media_content.set(key, str(value))
+
+        # Add guid element
+        guid = ET.SubElement(item, "guid")
+        guid.set("isPermaLink", "true")
+        guid.text = self.link
 
         return item
 

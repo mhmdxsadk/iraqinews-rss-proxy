@@ -45,9 +45,9 @@ class FeedEntry:
         link = ET.SubElement(item, "link")
         link.text = escape(self.link or "#")
 
-        # Properly escaped HTML description (will render readable in Inoreader)
+        # Properly escaped HTML description
         description = ET.SubElement(item, "description")
-        description.text = escape(self.description or "No description available")
+        description.text = self.description or "No description available"
 
         # GUID
         guid = ET.SubElement(item, "guid")

@@ -53,7 +53,15 @@ class FeedEntry:
 
         # Description with CDATA
         description = ET.SubElement(item, "description")
-        description.text = f"<![CDATA[{self.description}]]>"
+        # Unescape any HTML entities in the description before wrapping in CDATA
+        description_text = (
+            self.description.replace("&lt;", "<")
+            .replace("&gt;", ">")
+            .replace("&quot;", '"')
+            .replace("&apos;", "'")
+            .replace("&amp;", "&")
+        )
+        description.text = f"<![CDATA[{description_text}]]>"
 
         if self.published:
             pubDate = ET.SubElement(item, "pubDate")
@@ -62,7 +70,15 @@ class FeedEntry:
         # Add full content if available
         if self.content:
             content_elem = ET.SubElement(item, "content:encoded")
-            content_elem.text = f"<![CDATA[{self.content}]]>"
+            # Unescape any HTML entities in the content before wrapping in CDATA
+            content_text = (
+                self.content.replace("&lt;", "<")
+                .replace("&gt;", ">")
+                .replace("&quot;", '"')
+                .replace("&apos;", "'")
+                .replace("&amp;", "&")
+            )
+            content_elem.text = f"<![CDATA[{content_text}]]>"
 
         # Add media content if available
         for media in self.media_content:

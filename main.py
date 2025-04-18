@@ -167,7 +167,7 @@ class FeedResponse:
             channel.append(entry.to_xml())
 
         xml_str = ET.tostring(rss, encoding="unicode", method="xml")
-        response = Response(xml_str, mimetype="application/xml")
+        response = Response(xml_str, mimetype="application/rss+xml")
 
         # Add security headers
         for key, value in self.headers.items():

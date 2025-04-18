@@ -51,26 +51,12 @@ class FeedEntry:
         link = ET.SubElement(item, "link")
         link.text = self.link
 
-        # Description with CDATA - keep HTML for preview but clean it up
+        # Description with CDATA - clean preview text
         description = ET.SubElement(item, "description")
-        # Clean up the description while preserving essential HTML
-        desc_text = self.description
-        if desc_text.strip().startswith("<"):
-            # Extract text from first paragraph or div if it exists
-            match = re.search(
-                r"<(?:p|div)[^>]*>(.*?)</(?:p|div)>", desc_text, re.DOTALL
-            )
-            if match:
-                desc_text = match.group(1)
-            # Remove any remaining HTML tags but keep the text
-            desc_text = re.sub(r"<[^>]+>", " ", desc_text)
-        # Clean up whitespace and truncate if needed
-        desc_text = " ".join(desc_text.split())
-        if len(desc_text) > 500:
-            desc_text = desc_text[:497] + "..."
-        # Wrap in a paragraph for better preview formatting
-        desc_text = f"<p>{desc_text}</p>"
-        description.text = f"<![CDATA[{desc_text}]]>"
+        desc_text = self._clean_description(self.description)
+        description.text = (
+            desc_text  # No need to wrap in CDATA, ElementTree will escape it properly
+        )
 
         # Full content in content:encoded
         if self.content:
@@ -99,6 +85,29 @@ class FeedEntry:
         guid.text = self.link
 
         return item
+
+    def _clean_description(self, text: str) -> str:
+        """Clean up description text for preview"""
+        # Remove the footer text that starts with "The post"
+        text = re.sub(r"The post .+ appeared first on .+\.", "", text)
+
+        # If we have HTML content
+        if text.strip().startswith("<"):
+            # Extract text from first paragraph or div if it exists
+            match = re.search(r"<(?:p|div)[^>]*>(.*?)</(?:p|div)>", text, re.DOTALL)
+            if match:
+                text = match.group(1)
+            # Remove any remaining HTML tags but keep the text
+            text = re.sub(r"<[^>]+>", " ", text)
+
+        # Clean up whitespace
+        text = " ".join(text.split())
+
+        # Truncate if needed
+        if len(text) > 500:
+            text = text[:497] + "..."
+
+        return text
 
 
 class FeedManager:

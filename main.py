@@ -1,4 +1,3 @@
-import html
 import logging
 import os
 import re
@@ -38,19 +37,22 @@ class FeedEntry:
         """Convert entry to XML element"""
         item = ET.Element("item")
 
-        elements = {
-            "title": self.title,
-            "link": self.link,
-            "description": html.escape(self.description or ""),
-        }
+        # Basic fields without escaping
+        title = ET.SubElement(item, "title")
+        title.text = self.title or "Untitled"
 
-        for key, value in elements.items():
-            element = ET.SubElement(item, key)
-            element.text = value
+        link = ET.SubElement(item, "link")
+        link.text = self.link or "#"
 
+        # Wrap raw HTML inside CDATA
+        description = ET.SubElement(item, "description")
+        description.text = f"<![CDATA[{self.description or ''}]]>"
+
+        # guid for Inoreader
         guid = ET.SubElement(item, "guid")
         guid.text = self.link
 
+        # Optional: pubDate
         if self.published:
             pub_date = ET.SubElement(item, "pubDate")
             pub_date.text = self.published

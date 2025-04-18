@@ -150,7 +150,11 @@ class FeedResponse:
 
     def create_xml_response(self, entries: List[FeedEntry]) -> Response:
         """Create XML response from feed entries"""
-        rss = ET.Element("rss", version="2.0")
+        rss = ET.Element(
+            "rss",
+            version="2.0",
+            attrib={"xmlns:content": "http://purl.org/rss/1.0/modules/content/"},
+        )
         channel = ET.SubElement(rss, "channel")
 
         # Add channel information

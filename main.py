@@ -181,9 +181,12 @@ class FeedResponse:
 
     def create_xml_response(self, entries: List[FeedEntry]) -> Response:
         """Create XML response from feed entries"""
+        # Create RSS root with proper namespaces
         rss = ET.Element("rss", version="2.0")
         rss.set("xmlns:content", "http://purl.org/rss/1.0/modules/content/")
         rss.set("xmlns:media", "http://search.yahoo.com/mrss/")
+        rss.set("xmlns:atom", "http://www.w3.org/2005/Atom")
+
         channel = ET.SubElement(rss, "channel")
 
         # Add channel information
@@ -199,14 +202,22 @@ class FeedResponse:
             element = ET.SubElement(channel, key)
             element.text = value
 
+        # Add atom:link for self-reference
+        atom_link = ET.SubElement(channel, "atom:link")
+        atom_link.set("href", "https://iraqinews-rss-proxy.fly.dev/")
+        atom_link.set("rel", "self")
+        atom_link.set("type", "application/rss+xml")
+
         # Add entries
         for entry in entries:
             channel.append(entry.to_xml())
 
-        # Generate XML with proper declaration
+        # Generate XML with proper declaration and formatting
         xml_declaration = '<?xml version="1.0" encoding="UTF-8"?>\n'
         xml_str = xml_declaration + ET.tostring(rss, encoding="unicode", method="xml")
-        response = Response(xml_str, mimetype="application/xml")
+
+        # Ensure proper RSS content type
+        response = Response(xml_str, mimetype="application/rss+xml")
 
         # Add security headers
         for key, value in self.headers.items():

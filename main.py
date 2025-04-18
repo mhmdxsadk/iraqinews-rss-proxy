@@ -4,8 +4,7 @@ import re
 import xml.etree.ElementTree as ET
 from datetime import datetime
 from functools import lru_cache
-from typing import List, Optional
-from xml.sax.saxutils import escape
+from typing import Dict, List, Optional
 
 import cloudscraper
 import feedparser
@@ -27,33 +26,56 @@ class FeedEntry:
     """Represents a single feed entry with validation and XML generation"""
 
     def __init__(
-        self, title: str, link: str, description: str, published: Optional[str] = None
+        self,
+        title: str,
+        link: str,
+        description: str,
+        published: Optional[str] = None,
+        content: Optional[str] = None,
+        media_content: Optional[List[Dict]] = None,
     ):
         self.title = title
         self.link = link
         self.description = description
         self.published = published
+        self.content = content
+        self.media_content = media_content or []
 
     def to_xml(self) -> ET.Element:
+        """Convert entry to XML element"""
         item = ET.Element("item")
 
-        ET.SubElement(item, "title").text = escape(self.title or "Untitled")
-        ET.SubElement(item, "link").text = escape(self.link or "#")
+        # Basic elements
+        elements = {
+            "title": self.title,
+            "link": self.link,
+            "description": self.description,
+        }
 
-        # Add basic description (optional short version)
-        description = ET.SubElement(item, "description")
-        description.text = escape(self.description or "")
-
-        # Add full HTML content using content:encoded
-        content_encoded = ET.SubElement(
-            item, "{http://purl.org/rss/1.0/modules/content/}encoded"
-        )
-        content_encoded.text = f"<![CDATA[{self.description or ''}]]>"
-
-        ET.SubElement(item, "guid").text = escape(self.link)
+        for key, value in elements.items():
+            element = ET.SubElement(item, key)
+            element.text = value
 
         if self.published:
-            ET.SubElement(item, "pubDate").text = self.published
+            pub_date = ET.SubElement(item, "pubDate")
+            pub_date.text = self.published
+
+        # Add content if available
+        if self.content:
+            content = ET.SubElement(
+                item,
+                "content:encoded",
+                xmlns="http://purl.org/rss/1.0/modules/content/",
+            )
+            content.text = self.content
+
+        # Add media content if available
+        for media in self.media_content:
+            media_element = ET.SubElement(
+                item, "media:content", xmlns="http://search.yahoo.com/mrss/"
+            )
+            for key, value in media.items():
+                media_element.set(key, value)
 
         return item
 
@@ -118,6 +140,15 @@ class FeedManager:
                             link=entry.link,
                             description=entry.description,
                             published=getattr(entry, "published", None),
+                            content=getattr(
+                                entry, "content", [{"value": entry.description}]
+                            )[0]["value"]
+                            if hasattr(entry, "content")
+                            else entry.description,
+                            media_content=[
+                                {"url": m["url"], "type": m.get("type", "image/jpeg")}
+                                for m in entry.get("media_content", [])
+                            ],
                         )
                         for entry in feed.entries
                         if "iraq/" in entry.link.lower()
@@ -150,11 +181,9 @@ class FeedResponse:
 
     def create_xml_response(self, entries: List[FeedEntry]) -> Response:
         """Create XML response from feed entries"""
-        rss = ET.Element(
-            "rss",
-            version="2.0",
-            attrib={"xmlns:content": "http://purl.org/rss/1.0/modules/content/"},
-        )
+        rss = ET.Element("rss", version="2.0", xmlns="http://www.w3.org/2005/Atom")
+        rss.set("xmlns:content", "http://purl.org/rss/1.0/modules/content/")
+        rss.set("xmlns:media", "http://search.yahoo.com/mrss/")
         channel = ET.SubElement(rss, "channel")
 
         # Add channel information
@@ -174,11 +203,8 @@ class FeedResponse:
         for entry in entries:
             channel.append(entry.to_xml())
 
-        # xml_str = ET.tostring(rss, encoding="unicode", method="xml")
-        xml_str = '<?xml version="1.0" encoding="UTF-8"?>\n' + ET.tostring(
-            rss, encoding="unicode", method="xml"
-        )
-        response = Response(xml_str, mimetype="application/rss+xml")
+        xml_str = ET.tostring(rss, encoding="unicode", method="xml")
+        response = Response(xml_str, mimetype="application/xml")
 
         # Add security headers
         for key, value in self.headers.items():

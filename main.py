@@ -37,9 +37,11 @@ def fetch_feed() -> Optional[str]:
 
 
 def create_cdata_element(tag: str, text: str, parent) -> etree._Element:
-    """Create an element with CDATA content"""
+    """Create an element with CDATA content with proper formatting"""
     elem = etree.SubElement(parent, tag)
-    elem.text = etree.CDATA(text)
+    # Format CDATA content with proper newlines and spacing
+    formatted_text = f"\n{text}\n"
+    elem.text = etree.CDATA(formatted_text)
     return elem
 
 
@@ -81,7 +83,9 @@ def filter_feed(feed_content: str) -> str:
             creator = item.find("{http://purl.org/dc/elements/1.1/}creator")
             if creator is not None:
                 create_cdata_element(
-                    "{http://purl.org/dc/elements/1.1/}creator", creator.text, new_item
+                    "{http://purl.org/dc/elements/1.1/}creator",
+                    creator.text.strip(),
+                    new_item,
                 )
 
             # Add publication date
@@ -92,7 +96,7 @@ def filter_feed(feed_content: str) -> str:
 
             # Add categories with CDATA
             for category in item.findall("category"):
-                create_cdata_element("category", category.text, new_item)
+                create_cdata_element("category", category.text.strip(), new_item)
 
             # Add guid
             guid = item.find("guid")
@@ -108,7 +112,9 @@ def filter_feed(feed_content: str) -> str:
                 desc_text = (
                     desc.text if desc.text else html.tostring(desc, encoding="unicode")
                 )
-                create_cdata_element("description", desc_text, new_item)
+                # Format description with proper newlines
+                formatted_desc = f"\n{desc_text.strip()}\n"
+                create_cdata_element("description", formatted_desc, new_item)
 
             # Add content:encoded with CDATA
             content = item.find("{http://purl.org/rss/1.0/modules/content/}encoded")
@@ -118,9 +124,11 @@ def filter_feed(feed_content: str) -> str:
                     if content.text
                     else html.tostring(content, encoding="unicode")
                 )
+                # Format content with proper newlines
+                formatted_content = f"\n{content_text.strip()}\n"
                 create_cdata_element(
                     "{http://purl.org/rss/1.0/modules/content/}encoded",
-                    content_text,
+                    formatted_content,
                     new_item,
                 )
 

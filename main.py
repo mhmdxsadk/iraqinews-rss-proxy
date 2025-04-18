@@ -22,25 +22,17 @@ def fetch_feed() -> Optional[str]:
         browser={"browser": "chrome", "platform": "darwin", "desktop": True}
     )
 
-    urls = [
-        "https://www.iraqinews.com/rss",
-        "https://www.iraqinews.com/feed",
-        "https://iraqinews.com/rss",
-        "https://iraqinews.com/feed",
-    ]
+    url = "https://www.iraqinews.com/rss/"
 
-    for url in urls:
-        try:
-            logger.info(f"Trying to fetch feed from {url}")
-            response = scraper.get(url, timeout=10)
-            response.raise_for_status()
-            logger.info(f"Successfully fetched feed from {url}")
-            return response.text
-        except Exception as e:
-            logger.warning(f"Failed to fetch from {url}: {str(e)}")
-            continue
-
-    return None
+    try:
+        logger.info(f"Fetching feed from {url}")
+        response = scraper.get(url, timeout=10)
+        response.raise_for_status()
+        logger.info(f"Successfully fetched feed (status code: {response.status_code})")
+        return response.text
+    except Exception as e:
+        logger.error(f"Failed to fetch feed: {str(e)}")
+        return None
 
 
 def filter_feed(feed_content: str) -> str:

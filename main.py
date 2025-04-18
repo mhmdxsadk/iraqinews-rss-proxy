@@ -41,23 +41,19 @@ class FeedEntry:
         self.content = content
         self.media_content = media_content or []
 
-    def _create_cdata_element(self, parent: ET.Element, tag: str, text: str) -> None:
-        """Create an element with CDATA content"""
-        elem = ET.SubElement(parent, tag)
-        elem.text = ET.CDATA(text)
-
     def to_xml(self) -> ET.Element:
         """Convert entry to XML element"""
         item = ET.Element("item")
 
-        # Title and link (no CDATA needed)
+        # Title and link
         title = ET.SubElement(item, "title")
         title.text = self.title
         link = ET.SubElement(item, "link")
         link.text = self.link
 
-        # Description and content with CDATA
-        self._create_cdata_element(item, "description", self.description)
+        # Description with HTML content
+        description = ET.SubElement(item, "description")
+        description.text = self.description
 
         if self.published:
             pubDate = ET.SubElement(item, "pubDate")
@@ -65,9 +61,10 @@ class FeedEntry:
 
         # Add full content if available
         if self.content:
-            self._create_cdata_element(
-                item, "{http://purl.org/rss/1.0/modules/content/}encoded", self.content
+            content_elem = ET.SubElement(
+                item, "{http://purl.org/rss/1.0/modules/content/}encoded"
             )
+            content_elem.text = self.content
 
         # Add media content if available
         for media in self.media_content:
@@ -217,11 +214,16 @@ class FeedResponse:
         for entry in entries:
             channel.append(entry.to_xml())
 
-        # Generate XML with proper declaration and formatting
-        xml_declaration = '<?xml version="1.0" encoding="UTF-8"?>\n'
-        xml_str = xml_declaration + ET.tostring(rss, encoding="unicode", method="xml")
+        # Generate XML with proper declaration
+        xml_str = '<?xml version="1.0" encoding="UTF-8"?>\n'
+        # Convert to string and manually wrap CDATA sections
+        entry_str = ET.tostring(rss, encoding="unicode", method="xml")
+        # Replace content sections with CDATA wrapped versions
+        entry_str = (
+            entry_str.replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&")
+        )
+        xml_str += entry_str
 
-        # Ensure proper RSS content type
         response = Response(xml_str, mimetype="application/rss+xml")
 
         # Add security headers

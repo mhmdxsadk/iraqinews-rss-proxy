@@ -1,6 +1,7 @@
 import logging
 import os
 from typing import Optional
+import xml.etree.ElementTree as ET
 
 import cloudscraper
 from flask import Flask, Response
@@ -14,6 +15,24 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s",
 )
 logger = logging.getLogger(__name__)
+
+
+def CDATA(text=None):
+    """Create a CDATA element"""
+    element = ET.Element(CDATA)
+    element.text = text
+    return element
+
+
+class ElementTreeCDATA(ET.ElementTree):
+    """Extended ElementTree that properly handles CDATA sections"""
+
+    def _write(self, file, node, encoding, namespaces):
+        if node.tag is CDATA:
+            text = node.text.encode(encoding) if encoding else node.text
+            file.write("<![CDATA[%s]]>" % text)
+        else:
+            super()._write(file, node, encoding, namespaces)
 
 
 def fetch_feed() -> Optional[str]:
@@ -37,8 +56,6 @@ def fetch_feed() -> Optional[str]:
 
 def filter_feed(feed_content: str) -> str:
     """Filter the feed to keep only Iraq-related articles"""
-    import xml.etree.ElementTree as ET
-
     # Parse the feed
     root = ET.fromstring(feed_content)
     channel = root.find("channel")
@@ -54,11 +71,42 @@ def filter_feed(feed_content: str) -> str:
     for item in items:
         channel.remove(item)
 
-    # Add back only Iraq-related items
+    # Add back only Iraq-related items with proper CDATA handling
     iraq_items = 0
     for item in items:
         link = item.find("link")
         if link is not None and "/iraq/" in link.text.lower():
+            # Handle description CDATA
+            old_desc = item.find("description")
+            if old_desc is not None:
+                item.remove(old_desc)
+                new_desc = ET.SubElement(item, "description")
+                new_desc.append(CDATA(old_desc.text))
+
+            # Handle content:encoded CDATA
+            content = item.find("{http://purl.org/rss/1.0/modules/content/}encoded")
+            if content is not None:
+                item.remove(content)
+                new_content = ET.SubElement(
+                    item, "{http://purl.org/rss/1.0/modules/content/}encoded"
+                )
+                new_content.append(CDATA(content.text))
+
+            # Handle creator CDATA
+            creator = item.find("{http://purl.org/dc/elements/1.1/}creator")
+            if creator is not None:
+                item.remove(creator)
+                new_creator = ET.SubElement(
+                    item, "{http://purl.org/dc/elements/1.1/}creator"
+                )
+                new_creator.append(CDATA(creator.text))
+
+            # Handle category CDATA
+            for category in item.findall("category"):
+                item.remove(category)
+                new_cat = ET.SubElement(item, "category")
+                new_cat.append(CDATA(category.text))
+
             channel.append(item)
             iraq_items += 1
 
@@ -66,14 +114,13 @@ def filter_feed(feed_content: str) -> str:
         f"Filtered feed: {iraq_items} Iraq-related items out of {len(items)} total items"
     )
 
-    # Convert back to string while preserving CDATA
-    feed_str = ET.tostring(root, encoding="unicode", method="xml")
+    # Convert to string with proper CDATA handling
+    tree = ElementTreeCDATA(root)
+    from io import BytesIO
 
-    # Fix CDATA sections that might have been escaped
-    feed_str = feed_str.replace("&lt;![CDATA[", "<![CDATA[").replace("]]&gt;", "]]>")
-
-    # Add XML declaration
-    return f'<?xml version="1.0" encoding="UTF-8"?>\n{feed_str}'
+    output = BytesIO()
+    tree.write(output, encoding="utf-8", xml_declaration=True)
+    return output.getvalue().decode("utf-8")
 
 
 # Initialize Flask app

@@ -51,9 +51,9 @@ class FeedEntry:
         link = ET.SubElement(item, "link")
         link.text = self.link
 
-        # Description with HTML content
+        # Description with CDATA
         description = ET.SubElement(item, "description")
-        description.text = self.description
+        description.text = f"<![CDATA[{self.description}]]>"
 
         if self.published:
             pubDate = ET.SubElement(item, "pubDate")
@@ -61,16 +61,12 @@ class FeedEntry:
 
         # Add full content if available
         if self.content:
-            content_elem = ET.SubElement(
-                item, "{http://purl.org/rss/1.0/modules/content/}encoded"
-            )
-            content_elem.text = self.content
+            content_elem = ET.SubElement(item, "content:encoded")
+            content_elem.text = f"<![CDATA[{self.content}]]>"
 
         # Add media content if available
         for media in self.media_content:
-            media_content = ET.SubElement(
-                item, "{http://search.yahoo.com/mrss/}content"
-            )
+            media_content = ET.SubElement(item, "media:content")
             for key, value in media.items():
                 media_content.set(key, str(value))
 
@@ -186,8 +182,12 @@ class FeedResponse:
         # Create RSS root with proper namespaces
         rss = ET.Element("rss", version="2.0")
         rss.set("xmlns:content", "http://purl.org/rss/1.0/modules/content/")
-        rss.set("xmlns:media", "http://search.yahoo.com/mrss/")
+        rss.set("xmlns:wfw", "http://wellformedweb.org/CommentAPI/")
+        rss.set("xmlns:dc", "http://purl.org/dc/elements/1.1/")
         rss.set("xmlns:atom", "http://www.w3.org/2005/Atom")
+        rss.set("xmlns:sy", "http://purl.org/rss/1.0/modules/syndication/")
+        rss.set("xmlns:slash", "http://purl.org/rss/1.0/modules/slash/")
+        rss.set("xmlns:media", "http://search.yahoo.com/mrss/")
 
         channel = ET.SubElement(rss, "channel")
 
@@ -196,8 +196,9 @@ class FeedResponse:
             "title": "Iraqi News - Iraq Filtered Feed",
             "link": "https://iraqinews.com/iraq",
             "description": "Filtered RSS feed from iraqinews.com containing only Iraq-related news",
-            "language": "en-us",
+            "language": "en-US",
             "lastBuildDate": datetime.now().strftime("%a, %d %b %Y %H:%M:%S +0000"),
+            "generator": "https://wordpress.org/?v=6.6.2",
         }
 
         for key, value in channel_info.items():
@@ -210,17 +211,23 @@ class FeedResponse:
         atom_link.set("rel", "self")
         atom_link.set("type", "application/rss+xml")
 
+        # Add syndication info
+        sy_update_period = ET.SubElement(channel, "sy:updatePeriod")
+        sy_update_period.text = "hourly"
+        sy_update_freq = ET.SubElement(channel, "sy:updateFrequency")
+        sy_update_freq.text = "1"
+
         # Add entries
         for entry in entries:
             channel.append(entry.to_xml())
 
         # Generate XML with proper declaration
         xml_str = '<?xml version="1.0" encoding="UTF-8"?>\n'
-        # Convert to string and manually wrap CDATA sections
+        # Convert to string and preserve CDATA sections
         entry_str = ET.tostring(rss, encoding="unicode", method="xml")
-        # Replace content sections with CDATA wrapped versions
-        entry_str = (
-            entry_str.replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&")
+        # Fix CDATA sections that were escaped
+        entry_str = entry_str.replace("&lt;![CDATA[", "<![CDATA[").replace(
+            "]]&gt;", "]]>"
         )
         xml_str += entry_str
 

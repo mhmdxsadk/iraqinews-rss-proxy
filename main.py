@@ -243,7 +243,8 @@ class FeedResponse:
 
     def create_xml_response(self, entries: List[FeedEntry]) -> Response:
         """Create XML response from feed entries"""
-        # Create RSS root with proper namespaces
+        # Start with XML declaration and RSS root with proper indentation
+        xml_str = '<?xml version="1.0" encoding="UTF-8"?>'
         rss = ET.Element("rss", version="2.0")
         rss.set("xmlns:content", "http://purl.org/rss/1.0/modules/content/")
         rss.set("xmlns:wfw", "http://wellformedweb.org/CommentAPI/")
@@ -251,49 +252,102 @@ class FeedResponse:
         rss.set("xmlns:atom", "http://www.w3.org/2005/Atom")
         rss.set("xmlns:sy", "http://purl.org/rss/1.0/modules/syndication/")
         rss.set("xmlns:slash", "http://purl.org/rss/1.0/modules/slash/")
-        rss.set("xmlns:media", "http://search.yahoo.com/mrss/")
 
         channel = ET.SubElement(rss, "channel")
 
-        # Add channel information
-        channel_info = {
-            "title": "Iraqi News - Iraq Filtered Feed",
-            "link": "https://iraqinews.com/iraq",
-            "description": "Filtered RSS feed from iraqinews.com containing only Iraq-related news",
-            "language": "en-US",
-            "lastBuildDate": datetime.now().strftime("%a, %d %b %Y %H:%M:%S +0000"),
-            "generator": "https://wordpress.org/?v=6.6.2",
-        }
+        # Add channel information with proper indentation
+        channel_title = ET.SubElement(channel, "title")
+        channel_title.text = "Iraqi News"
 
-        for key, value in channel_info.items():
-            element = ET.SubElement(channel, key)
-            element.text = value
-
-        # Add atom:link for self-reference
         atom_link = ET.SubElement(channel, "atom:link")
-        atom_link.set("href", "https://iraqinews-rss-proxy.fly.dev/")
+        atom_link.set("href", "https://www.iraqinews.com/feed/")
         atom_link.set("rel", "self")
         atom_link.set("type", "application/rss+xml")
 
-        # Add syndication info
-        sy_update_period = ET.SubElement(channel, "sy:updatePeriod")
-        sy_update_period.text = "hourly"
-        sy_update_freq = ET.SubElement(channel, "sy:updateFrequency")
-        sy_update_freq.text = "1"
+        link = ET.SubElement(channel, "link")
+        link.text = "https://www.iraqinews.com/"
+
+        description = ET.SubElement(channel, "description")
+        description.text = ""
+
+        last_build_date = ET.SubElement(channel, "lastBuildDate")
+        last_build_date.text = datetime.now().strftime("%a, %d %b %Y %H:%M:%S +0000")
+
+        language = ET.SubElement(channel, "language")
+        language.text = "en-US"
+
+        update_period = ET.SubElement(channel, "sy:updatePeriod")
+        update_period.text = "\n\thourly\t"
+
+        update_frequency = ET.SubElement(channel, "sy:updateFrequency")
+        update_frequency.text = "\n\t1\t"
+
+        generator = ET.SubElement(channel, "generator")
+        generator.text = "https://wordpress.org/?v=6.6.2"
+
+        # Add image element
+        image = ET.SubElement(channel, "image")
+        image_url = ET.SubElement(image, "url")
+        image_url.text = "https://www.iraqinews.com/wp-content/uploads/2021/11/cropped-favico-32x32.png"
+        image_title = ET.SubElement(image, "title")
+        image_title.text = "Iraqi News"
+        image_link = ET.SubElement(image, "link")
+        image_link.text = "https://www.iraqinews.com/"
+        image_width = ET.SubElement(image, "width")
+        image_width.text = "32"
+        image_height = ET.SubElement(image, "height")
+        image_height.text = "32"
 
         # Add entries
         for entry in entries:
-            channel.append(entry.to_xml())
+            item = ET.SubElement(channel, "item")
 
-        # Generate XML with proper declaration
-        xml_str = '<?xml version="1.0" encoding="UTF-8"?>\n'
-        # Convert to string and preserve CDATA sections
+            title = ET.SubElement(item, "title")
+            title.text = entry.title
+
+            link = ET.SubElement(item, "link")
+            link.text = entry.link
+
+            # Add creator
+            creator = ET.SubElement(item, "dc:creator")
+            creator.text = f"<![CDATA[IraqiNews]]>"
+
+            if entry.published:
+                pubDate = ET.SubElement(item, "pubDate")
+                pubDate.text = entry.published
+
+            # Add categories
+            category = ET.SubElement(item, "category")
+            category.text = f"<![CDATA[Iraq]]>"
+
+            guid = ET.SubElement(item, "guid")
+            guid.set("isPermaLink", "false")
+            guid.text = entry.link
+
+            description = ET.SubElement(item, "description")
+            description.text = f"<![CDATA[{entry.description}]]>"
+
+            if entry.content:
+                content = ET.SubElement(item, "content:encoded")
+                content.text = f"<![CDATA[\n{entry.content}\n]]>"
+
+        # Convert to string with proper formatting
+        xml_str = '<?xml version="1.0" encoding="UTF-8"?>'
         entry_str = ET.tostring(rss, encoding="unicode", method="xml")
-        # Fix CDATA sections that were escaped
-        entry_str = entry_str.replace("&lt;![CDATA[", "<![CDATA[").replace(
-            "]]&gt;", "]]>"
-        )
-        xml_str += entry_str
+
+        # Add newline after XML declaration and preserve CDATA
+        xml_str = f"{xml_str}\n{entry_str}"
+
+        # Fix CDATA sections
+        xml_str = xml_str.replace("&lt;![CDATA[", "<![CDATA[").replace("]]&gt;", "]]>")
+
+        # Add proper indentation
+        xml_str = xml_str.replace("<rss", "<rss\n\t")
+        xml_str = xml_str.replace(" xmlns:", "\n\txmlns:")
+        xml_str = xml_str.replace("<channel>", "\n<channel>")
+        xml_str = xml_str.replace("</channel>", "\n</channel>")
+        xml_str = xml_str.replace("<item>", "\n\t<item>")
+        xml_str = xml_str.replace("</item>", "\n\t</item>")
 
         response = Response(xml_str, mimetype="application/rss+xml")
 

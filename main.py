@@ -23,7 +23,7 @@ def fetch_feed() -> Optional[str]:
         browser={"browser": "chrome", "platform": "darwin", "desktop": True}
     )
 
-    url = "https://www.iraqinews.com/rss/"
+    url = "https://www.iraqinews.com/feed/"
 
     try:
         logger.info(f"Fetching feed from {url}")

@@ -38,7 +38,7 @@ class FeedEntry:
         self.link = link
         self.description = description
         self.published = published
-        self.content = content
+        self.content = content or description  # Fallback to description if no content
         self.media_content = media_content or []
 
     def to_xml(self) -> ET.Element:
@@ -51,40 +51,39 @@ class FeedEntry:
         link = ET.SubElement(item, "link")
         link.text = self.link
 
-        # Description with CDATA
+        # Description with CDATA - keep it short for preview
         description = ET.SubElement(item, "description")
-        # Unescape any HTML entities in the description before wrapping in CDATA
-        description_text = (
-            self.description.replace("&lt;", "<")
-            .replace("&gt;", ">")
-            .replace("&quot;", '"')
-            .replace("&apos;", "'")
-            .replace("&amp;", "&")
+        desc_text = (
+            self.description[:500] + "..."
+            if len(self.description) > 500
+            else self.description
         )
-        description.text = f"<![CDATA[{description_text}]]>"
+        description.text = f"<![CDATA[{desc_text}]]>"
+
+        # Full content in content:encoded
+        if self.content:
+            content_ns = "{http://purl.org/rss/1.0/modules/content/}"
+            content_elem = ET.SubElement(item, f"{content_ns}encoded")
+            # Ensure content has proper HTML structure
+            content_text = self.content
+            if not content_text.strip().startswith("<"):
+                content_text = f"<p>{content_text}</p>"
+            content_elem.text = f"<![CDATA[{content_text}]]>"
 
         if self.published:
             pubDate = ET.SubElement(item, "pubDate")
             pubDate.text = self.published
 
-        # Add full content if available
-        if self.content:
-            content_elem = ET.SubElement(item, "content:encoded")
-            # Unescape any HTML entities in the content before wrapping in CDATA
-            content_text = (
-                self.content.replace("&lt;", "<")
-                .replace("&gt;", ">")
-                .replace("&quot;", '"')
-                .replace("&apos;", "'")
-                .replace("&amp;", "&")
-            )
-            content_elem.text = f"<![CDATA[{content_text}]]>"
-
-        # Add media content if available
+        # Add media content with proper namespace
         for media in self.media_content:
-            media_content = ET.SubElement(item, "media:content")
+            media_ns = "{http://search.yahoo.com/mrss/}"
+            media_content = ET.SubElement(item, f"{media_ns}content")
             for key, value in media.items():
                 media_content.set(key, str(value))
+            # Add media:thumbnail for better preview support
+            if media.get("type", "").startswith("image/"):
+                thumbnail = ET.SubElement(item, f"{media_ns}thumbnail")
+                thumbnail.set("url", media["url"])
 
         # Add guid element
         guid = ET.SubElement(item, "guid")
@@ -152,17 +151,26 @@ class FeedManager:
                         FeedEntry(
                             title=entry.title,
                             link=entry.link,
-                            description=entry.description,
+                            description=getattr(entry, "summary", entry.description),
                             published=getattr(entry, "published", None),
-                            content=getattr(
-                                entry, "content", [{"value": entry.description}]
-                            )[0]["value"]
-                            if hasattr(entry, "content")
-                            else entry.description,
+                            content=(
+                                getattr(entry, "content", [{"value": ""}])[0].get(
+                                    "value"
+                                )
+                                or getattr(entry, "summary", "")
+                                or entry.description
+                            ),
                             media_content=[
-                                {"url": m["url"], "type": m.get("type", "image/jpeg")}
+                                {
+                                    "url": m.get("url", ""),
+                                    "type": m.get("type", "image/jpeg"),
+                                    "width": m.get("width", "800"),
+                                    "height": m.get("height", "600"),
+                                }
                                 for m in entry.get("media_content", [])
-                            ],
+                                if m.get("url")
+                            ]
+                            or self._extract_images_from_content(entry),
                         )
                         for entry in feed.entries
                         if "iraq/" in entry.link.lower()
@@ -176,6 +184,29 @@ class FeedManager:
             raise last_error
 
         return []
+
+    def _extract_images_from_content(self, entry) -> List[Dict]:
+        """Extract images from entry content if no media_content is present"""
+        content = (
+            getattr(entry, "content", [{"value": ""}])[0].get("value")
+            or getattr(entry, "summary", "")
+            or entry.description
+        )
+
+        # Simple regex to extract image URLs from content
+        img_pattern = re.compile(r'<img[^>]+src="([^"]+)"')
+        matches = img_pattern.findall(content)
+
+        return [
+            {
+                "url": url,
+                "type": "image/jpeg",
+                "width": "800",
+                "height": "600",
+            }
+            for url in matches
+            if url.startswith("http")
+        ]
 
 
 class FeedResponse:

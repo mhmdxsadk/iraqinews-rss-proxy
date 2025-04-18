@@ -51,24 +51,32 @@ class FeedEntry:
         link = ET.SubElement(item, "link")
         link.text = self.link
 
-        # Description with CDATA - keep it short for preview
+        # Description with CDATA - keep HTML for preview but clean it up
         description = ET.SubElement(item, "description")
-        desc_text = (
-            self.description[:500] + "..."
-            if len(self.description) > 500
-            else self.description
-        )
+        # Clean up the description while preserving essential HTML
+        desc_text = self.description
+        if desc_text.strip().startswith("<"):
+            # Extract text from first paragraph or div if it exists
+            match = re.search(
+                r"<(?:p|div)[^>]*>(.*?)</(?:p|div)>", desc_text, re.DOTALL
+            )
+            if match:
+                desc_text = match.group(1)
+            # Remove any remaining HTML tags but keep the text
+            desc_text = re.sub(r"<[^>]+>", " ", desc_text)
+        # Clean up whitespace and truncate if needed
+        desc_text = " ".join(desc_text.split())
+        if len(desc_text) > 500:
+            desc_text = desc_text[:497] + "..."
+        # Wrap in a paragraph for better preview formatting
+        desc_text = f"<p>{desc_text}</p>"
         description.text = f"<![CDATA[{desc_text}]]>"
 
         # Full content in content:encoded
         if self.content:
             content_ns = "{http://purl.org/rss/1.0/modules/content/}"
             content_elem = ET.SubElement(item, f"{content_ns}encoded")
-            # Ensure content has proper HTML structure
-            content_text = self.content
-            if not content_text.strip().startswith("<"):
-                content_text = f"<p>{content_text}</p>"
-            content_elem.text = f"<![CDATA[{content_text}]]>"
+            content_elem.text = f"<![CDATA[{self.content}]]>"
 
         if self.published:
             pubDate = ET.SubElement(item, "pubDate")
